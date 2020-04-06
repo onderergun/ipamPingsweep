@@ -101,8 +101,11 @@ def main():
        subnetend = ".".join(octets[0:3]) + ".253"
        range = subnetid + "-" + subnetstart + "|" + subnetend
        
+       percentavailable = subnets[i]["percentavailable"]
+       emailwarning = float(subnets[i]["emailwarning"])
+       emailcritical = float(subnets[i]["emailcritical"])
+       
        allocations=getAllocations(cvpServer, session_id, session_token, range)
-              
        k=0
        allocIPs = {}
        for alloc in allocations:
@@ -113,6 +116,12 @@ def main():
        response=subnetSweep(cvpServer, session_id, session_token, subnetid)
        aliveIPs=[]
        message = ""
+       if (100-percentavailable) > emailcritical:
+           message = message + "Available IP addresses in this subnet is below CRITICAL THRESHOLD " + str(emailcritical) + "\n" + "\n"
+       else:
+           if (100-percentavailable) > emailwarning:
+               message = message + "Available IP addresses in this subnet is below WARNING THRESHOLD " + str(emailwarning) + "\n" + "\n" 
+
        k=0
        if response is not None:
            for ips in response:
@@ -134,7 +143,7 @@ def main():
                message = message + key +  " is allocated but DEAD\n"
            k+=1
        
-       send_from = "email@domain.com"
+       send_from = "sender@domain.com"
        send_to = notificationemails
        subject = "Ping Sweep Report for Subnet "+ subnet + "    "+ d1
        files =[]

@@ -76,7 +76,6 @@ def main():
     password = getpass()
     cvpServer=args.cvpServer
 
-
     print ('Start Login')
     login_data = {'username': username, 'password': password}
     login_resp = requests.post('https://%s/cvp-ipam-api/login' % cvpServer,
@@ -90,27 +89,26 @@ def main():
     
     id = "network1-ipv4"
     subnets = getPools(cvpServer, session_id, session_token, id)
-    i=0
-    for net in subnets:
-       notificationemails=subnets[i]["notificationemails"].split(",")
 
-       subnetid = subnets[i]["id"]
-       subnet = subnets[i]["range"]
+    for num, net in enumerate(subnets):
+       notificationemails= net["notificationemails"].split(",")
+
+       subnetid = net["id"]
+       subnet = net["range"]
        octets= subnet.split(".")
        subnetstart = ".".join(octets[0:3]) + ".1"
        subnetend = ".".join(octets[0:3]) + ".253"
        range = subnetid + "-" + subnetstart + "|" + subnetend
        
-       percentavailable = subnets[i]["percentavailable"]
-       emailwarning = float(subnets[i]["emailwarning"])
-       emailcritical = float(subnets[i]["emailcritical"])
+       percentavailable = net["percentavailable"]
+       emailwarning = float(net["emailwarning"])
+       emailcritical = float(net["emailcritical"])
        
        allocations=getAllocations(cvpServer, session_id, session_token, range)
-       k=0
+
        allocIPs = {}
-       for alloc in allocations:
-           allocIPs[allocations[k]["address"]] = [allocations[k]["description"]]
-           k+=1
+       for address, alloc in enumerate(allocations):
+           allocIPs[alloc["address"]] = [alloc["description"]]
        
        print (subnetid)
        response=subnetSweep(cvpServer, session_id, session_token, subnetid)
@@ -122,26 +120,22 @@ def main():
            if (100-percentavailable) > emailwarning:
                message = message + "Available IP addresses in this subnet is below WARNING THRESHOLD " + str(emailwarning) + "\n" + "\n" 
 
-       k=0
        if response is not None:
-           for ips in response:
-               aliveIPs.append(response[k]["IP"])
-               if (response[k]["Alive"] == True):
-                   if (response[k]["IP"] not in allocIPs):
-                       print (response[k]["IP"], "is not allocated but ALIVE")
-                       message = message + response[k]["IP"] + " is not allocated but ALIVE\n"
-                   if response[k]["IP"] in allocIPs:
-                       if (allocIPs[response[k]["IP"]] == ['Reserved']):
-                           print (response[k]["IP"], "is RESERVED but ALIVE")
-                           message = message + response[k]["IP"] + " is RESERVED but ALIVE\n"
-                
-               k+=1
-       k=0
+           for ips, network in enumerate(response):
+               aliveIPs.append(network["IP"])
+               if (network["Alive"] == True):
+                   if (network["IP"] not in allocIPs):
+                       print (network["IP"], "is not allocated but ALIVE")
+                       message = message + network["IP"] + " is not allocated but ALIVE\n"
+                   if network["IP"] in allocIPs:
+                       if (allocIPs[network["IP"]] == ['Reserved']):
+                           print (network["IP"], "is RESERVED but ALIVE")
+                           message = message + network["IP"] + " is RESERVED but ALIVE\n"
+       
        for key,value in allocIPs.items():
            if ((key not in aliveIPs) and (value != ['Reserved'])):
                print (key, "is allocated but DEAD")
                message = message + key +  " is allocated but DEAD\n"
-           k+=1
        
        send_from = "sender@domain.com"
        send_to = notificationemails
@@ -153,8 +147,6 @@ def main():
        port =587
        use_tls = True
        send_mail(send_from, send_to, subject, message, files, server, port, username, password, use_tls )
-       
-       i+=1
     
     print ('\n')
     print ('Start Logout')
